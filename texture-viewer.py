@@ -24,12 +24,12 @@ def MakeAndDisplayTexture(pix, w, h):
             # NOTE: Alpha is not supported at this time.
             p = 0xFF000000 + red + green * 256 + blue * (256 ** 2)
             row.append(p)
-            mat.append(row)
+        mat.append(row)
 
     numpy_mat = numpy.array(mat, numpy.uint32)
     img = Image.fromarray(numpy_mat, 'RGBA')
     img.save('/home/mateusz/my.png')
-
+    os.system('feh /home/mateusz/my.png --force-aliasing')
 
 class DisplayRawTexture (gdb.Command):
     """
@@ -77,5 +77,5 @@ class DisplaySDLSurface (gdb.Command):
 
 
 # GDB requires that they are initialized here.
-HelloWorld()
+DisplayRawTexture()
 DisplaySDLSurface()
