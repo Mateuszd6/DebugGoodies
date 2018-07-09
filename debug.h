@@ -57,16 +57,32 @@
 // expr is false, macro is expanded into panic, in debug mode,
 // this is just regular asser.
 #ifdef DEBUG
-#define always_assert(expr)                                     \
-    do {                                                        \
-        assert(expr);                                           \
-    } while(0)
+  #define always_assert(expr)                                     \
+      do {                                                        \
+          assert(expr);                                           \
+      } while(0)
 #else
-#define always_assert(expr)                                     \
-    do {                                                        \
-        if (!(expr))                                            \
-        {                                                       \
-            panic("Assertion broken: %s\n", #expr);             \
-        }                                                       \
-    } while(0)
+  #define always_assert(expr)                                     \
+      do {                                                        \
+          if (!(expr))                                            \
+          {                                                       \
+              panic("Assertion broken: %s\n", #expr);             \
+          }                                                       \
+      } while(0)
+#endif
+
+#if defined(__x86_64__)
+  static __inline__ unsigned long long rdtsc(void)
+  {
+      unsigned hi, lo;
+      __asm__ __volatile__ ("rdtsc" : "=a"(lo), "=d"(hi));
+      return ((unsigned long long)lo) | (((unsigned long long)hi) << 32);
+  }
+#else
+  // TODO: Get rid of this horribly ugly hack.
+  int main()
+  {
+      static_assert(0, "Platform is not supported");
+  }
+#define main main__
 #endif
