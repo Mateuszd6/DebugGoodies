@@ -1,29 +1,34 @@
 #include <signal.h>
 
-#ifndef RELEASE_PANIC_BEHAVIOUR
-// This is what will happen in the panic macro by default
-#define RELEASE_PANIC_BEHAVIOUR(msg, ...)                       \
+#define DEFAULT_PANIC_BEHAVIOUR(msg, ...)                       \
     do {                                                        \
         fprintf(stderr, "%s:%d: Panic: ", __FILE__, __LINE__);  \
         fprintf(stderr, msg, ##__VA_ARGS__);                    \
         fprintf(stderr, "\n");                                  \
-        std::exit(1);                                           \
     } while(0)
+
+// Panic macro defaults. Can be redefined to do whatever user wants.
+#ifndef DEBUG_PANIC_BEHAVIOUR
+#define DEBUG_PANIC_BEHAVIOUR(msg, ...)                         \
+    DEFAULT_PANIC_BEHAVIOUR(msg, ##__VA_ARGS__)
+#endif
+
+#ifndef RELEASE_PANIC_BEHAVIOUR
+#define RELEASE_PANIC_BEHAVIOUR(msg, ...)                       \
+    DEFAULT_PANIC_BEHAVIOUR(msg, ##__VA_ARGS__)
 #endif
 
 /// PANIC (string formatted).
 // This is compiled with a release build and is used to give a
 // error feedback to the user. In debug build, its just break.
 #ifdef DEBUG
-#define PANIC(msg, ...)                                         \
+#define panic(msg, ...)                                         \
     do {                                                        \
-        fprintf(stderr, "%s:%d: _Panic: ", __FILE__, __LINE__); \
-        fprintf(stderr, msg, ##__VA_ARGS__);                    \
-        fprintf(stderr, "\n");                                  \
+        DEBUG_PANIC_BEHAVIOUR(msg, ##__VA_ARGS__);              \
         raise(SIGTRAP);                                         \
     } while(0)
 #else
-#define PANIC(msg, ...)                                         \
+#define panic(msg, ...)                                         \
     do {                                                        \
         RELEASE_PANIC_BEHAVIOUR(msg, ##__VA_ARGS__);            \
     } while(0)
@@ -33,7 +38,7 @@
 // Make a debug break in debug mode, and ignore this statement
 // in release mode.
 #ifdef DEBUG
-#define ASSERT(expr)                                            \
+#define assert(expr)                                            \
     do {                                                        \
         if (!(expr))                                            \
         {                                                       \
@@ -44,7 +49,7 @@
         }                                                       \
     } while(0)
 #else
-#define ASSERT(ignore) ((void)0)
+#define assert(ignore) ((void)0)
 #endif
 
 /// RUNTIME ASSERT.
@@ -52,16 +57,16 @@
 // expr is false, macro is expanded into panic, in debug mode,
 // this is just regular asser.
 #ifdef DEBUG
-#define RUNTIME_ASSERT(expr)                                    \
+#define always_assert(expr)                                     \
     do {                                                        \
-        ASSERT(expr);                                           \
+        assert(expr);                                           \
     } while(0)
 #else
-#define RUNTIME_ASSERT(expr)                                    \
+#define always_assert(expr)                                     \
     do {                                                        \
         if (!(expr))                                            \
         {                                                       \
-            PANIC("Assertion broken: %s\n", expr);              \
+            panic("Assertion broken: %s\n", #expr);             \
         }                                                       \
     } while(0)
 #endif
