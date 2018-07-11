@@ -7,7 +7,8 @@
         fprintf(stderr, "\n");                                  \
     } while(0)
 
-// Panic macro defaults. Can be redefined to do whatever user wants.
+// Panic macro defaults.
+// Can be redefined to do whatever user wants.
 #ifndef DEBUG_PANIC_BEHAVIOUR
 #define DEBUG_PANIC_BEHAVIOUR(msg, ...)                         \
     DEFAULT_PANIC_BEHAVIOUR(msg, ##__VA_ARGS__)
@@ -22,13 +23,13 @@
 // This is compiled with a release build and is used to give a
 // error feedback to the user. In debug build, its just break.
 #ifdef DEBUG
-#define panic(msg, ...)                                         \
+#define PANIC(msg, ...)                                         \
     do {                                                        \
         DEBUG_PANIC_BEHAVIOUR(msg, ##__VA_ARGS__);              \
         raise(SIGTRAP);                                         \
     } while(0)
 #else
-#define panic(msg, ...)                                         \
+#define PANIC(msg, ...)                                         \
     do {                                                        \
         RELEASE_PANIC_BEHAVIOUR(msg, ##__VA_ARGS__);            \
     } while(0)
@@ -38,7 +39,7 @@
 // Make a debug break in debug mode, and ignore this statement
 // in release mode.
 #ifdef DEBUG
-#define assert(expr)                                            \
+#define ASSERT(expr)                                            \
     do {                                                        \
         if (!(expr))                                            \
         {                                                       \
@@ -49,40 +50,33 @@
         }                                                       \
     } while(0)
 #else
-#define assert(ignore) ((void)0)
+#define ASSERT(ignore) ((void)0)
 #endif
 
 /// RUNTIME ASSERT.
 // Assertion that is evaluated at runtime. In release mode, if
-// expr is false, macro is expanded into panic, in debug mode,
+// expr is false, macro is expanded into PANIC, in debug mode,
 // this is just regular asser.
 #ifdef DEBUG
-  #define always_assert(expr)                                     \
+  #define ALWAYS_ASSERT(expr)                                     \
       do {                                                        \
-          assert(expr);                                           \
+          ASSERT(expr);                                           \
       } while(0)
 #else
-  #define always_assert(expr)                                     \
+  #define ALWAYS_ASSERT(expr)                                     \
       do {                                                        \
           if (!(expr))                                            \
           {                                                       \
-              panic("Assertion broken: %s\n", #expr);             \
+              PANIC("Assertion broken: %s\n", #expr);             \
           }                                                       \
       } while(0)
 #endif
 
-#if defined(__x86_64__)
-  static __inline__ unsigned long long rdtsc(void)
-  {
-      unsigned hi, lo;
-      __asm__ __volatile__ ("rdtsc" : "=a"(lo), "=d"(hi));
-      return ((unsigned long long)lo) | (((unsigned long long)hi) << 32);
-  }
+/// UNREACHABLE.
+// Marks code as unreachable. In debug mode this causes panic,
+// in release marks as unreachable using __builtin_unreachable
+#ifdef DEBUG
+  #define UNREACHABLE() PANIC("Unreachable code reached!")
 #else
-  // TODO: Get rid of this horribly ugly hack.
-  int main()
-  {
-      static_assert(0, "Platform is not supported");
-  }
-#define main main__
+  #define UNREACHABLE() __builtin_unreachable()
 #endif
