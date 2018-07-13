@@ -163,7 +163,7 @@ namespace debug {
         {
             // Identifier of the query,
             // e.g. name of the function.
-            char name[64];
+            char *name;
 
             // Start time.
             std::chrono::time_point<std::chrono::system_clock>
@@ -176,6 +176,7 @@ namespace debug {
 }
 #endif
 
+#if 0
 // Start performance timer. Does nothing if 'BENCHMARK'
 // is not defined.
 #ifdef BENCHMARK
@@ -187,6 +188,20 @@ namespace debug {
               .timer = std::chrono::system_clock::now()         \
           };                                                    \
       } while(0);
+#else
+  #define PUSH_TIMER(NAME) ((void)0)
+#endif
+#endif
+
+// Start performance timer. Does nothing if 'BENCHMARK'
+// is not defined.
+#ifdef BENCHMARK
+  #define PUSH_TIMER(NAME)                                                 \
+      do {                                                                 \
+          debug::detail::counters_stack[debug::detail::index].name = NAME; \
+          debug::detail::counters_stack[debug::detail::index++].timer =    \
+                std::chrono::system_clock::now();                          \
+      } while(0)
 #else
   #define PUSH_TIMER(NAME) ((void)0)
 #endif
