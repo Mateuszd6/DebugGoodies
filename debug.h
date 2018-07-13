@@ -1,6 +1,5 @@
-#include <signal.h>
-
 // -------> Define 'DEBUG' to enable:
+// ---> BREAK()
 // ---> PANIC(msg, ...)
 // ---> ASSERT(expr)
 // ---> ALWAYS_ASSERT(expr)
@@ -11,6 +10,19 @@
 // ---> POP_TIMER()
 // ---> RUN_BENCHMARK(NAME, REPEAT, EXPR)
 // ---> BENCHMARK_BEFORE_MAIN(NAME, REPEAT, EXPR)
+
+// Cross platform debug break.
+#if defined(__clang__)
+  #include <signal.h>
+  #define ___DEBUG_BREAK() raise(SIGTRAP)
+#elif defined(__GNUC__) || defined(__GNUG__)
+  #include <signal.h>
+  #define ___DEBUG_BREAK() raise(SIGTRAP)
+#elif defined(_MSC_VER)
+  // TODO:
+#endif
+
+// TODO: Add ability not to use chrono.
 
 // NOTE: How to make an anonymus name of the variable.
 #define ___CONCATENATE_IMPL(NAME1, NAME2) NAME1##NAME2
@@ -25,10 +37,14 @@
     struct NAME                                                 \
     {                                                           \
         NAME() { EXPR; }                                        \
-    }; NAME ANONYMUS_NAME(_)
+    }; NAME ANONYMUS_NAME(___ANON_VARIABLE_NAME___)
 
 #define RUN_BEFORE_MAIN(EXPR)                                   \
-    ___RUN_BEFORE_MAIN_AUX(ANONYMUS_NAME(_), EXPR)
+    ___RUN_BEFORE_MAIN_AUX(ANONYMUS_NAME(                       \
+                               ___ANON_VARIABLE_NAME___), EXPR)
+
+// ------------------- DEBUG BREAK -------------------
+#define BREAK() ___DEBUG_BREAK()
 
 // ------------------- ASSERTIONS -------------------
 // Default panic behaviour. If either 'DEBUG_PANIC_BEHAVIOUR' or
@@ -41,11 +57,12 @@
     } while(0)
 
 // Panic macro defaults.
-// Can be redefined to do whatever user wants.
+// These can be redefined to do whatever user wants.
 #ifndef DEBUG_PANIC_BEHAVIOUR
   #define DEBUG_PANIC_BEHAVIOUR(MSG, ...)                       \
       DEFAULT_PANIC_BEHAVIOUR(MSG, ##__VA_ARGS__)
 #endif
+
 #ifndef RELEASE_PANIC_BEHAVIOUR
   #define RELEASE_PANIC_BEHAVIOUR(MSG, ...)                     \
       DEFAULT_PANIC_BEHAVIOUR(MSG, ##__VA_ARGS__)
@@ -58,7 +75,7 @@
 #define PANIC(MSG, ...)                                         \
     do {                                                        \
         DEBUG_PANIC_BEHAVIOUR(MSG, ##__VA_ARGS__);              \
-        raise(SIGTRAP);                                         \
+        BREAK();                                                \
     } while(0)
 #else
 #define PANIC(MSG, ...)                                         \
@@ -78,7 +95,7 @@
             fprintf(stderr, "%s:%d: Assertion broken: %s\n",    \
                     __FILE__, __LINE__, #EXPR);                 \
                                                                 \
-            raise(SIGTRAP);                                     \
+            BREAK();                                            \
         }                                                       \
     } while(0)
 #else
@@ -192,7 +209,7 @@ namespace debug {
       } while(0)
 
 #else
-  #define POP_TIMER() ;
+  #define POP_TIMER() ((void)0)
 #endif
 
 // Repeat 'REPEAT' times benchark and report results.
@@ -248,11 +265,12 @@ namespace debug {
             float avg = sum / REPEAT;                                    \
             BENCHMARK_MSG(BNAME, REPEAT, best, worse, avg);              \
         }                                                                \
-    }; NAME ANONYMUS_NAME(_)
+    }; NAME ANONYMUS_NAME(___ANON_VARIABLE_NAME___)
 
 #ifdef BENCHMARK
   #define BENCHMARK_BEFORE_MAIN(NAME, REPEAT, EXPR)                      \
-      ___BENCHMARK_BEFORE_MAIN_AUX(ANONYMUS_NAME(_), NAME, REPEAT, EXPR)
+    ___BENCHMARK_BEFORE_MAIN_AUX(                                        \
+        ANONYMUS_NAME(___ANON_VARIABLE_NAME___), NAME, REPEAT, EXPR)
 #else
   #define BENCHMARK_BEFORE_MAIN(NAME, REPEAT, EXPR) ;
 #endif
