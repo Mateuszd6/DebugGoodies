@@ -20,6 +20,7 @@
 // * LOG_FATAL
 
 // Other definable stuff:
+// * LOG_GODIES_USE_DATE (To add date & time to your logs)
 // * DEBUG_GOODIES_FPRINTF (If you don't want to use fprintf)
 // * DEBUG_GODIES_BENCHMARK_FILE (To redirect benchmarks results)
 // * DEBUG_GODIES_LOG_FILE (To redirect logs to the file, not stderr)
@@ -84,15 +85,43 @@
   #define DEBUG_GODIES_LOG_FILE stderr
 #endif
 
+// Define 'LOG_GODIES_USE_DATE' for time info in logs, requires chorno
+#ifdef LOG_GODIES_USE_DATE
+  #include <chrono>
+  #define ____PRINT_DATETIME_TO_FILE(_FILE)                              \
+      do {                                                               \
+          auto in_time_t =                                               \
+              std::chrono::system_clock::to_time_t(                      \
+                  std::chrono::system_clock::now());                     \
+          auto tm_info = localtime(&in_time_t);                          \
+                                                                         \
+          DEBUG_GOODIES_FPRINTF(                                         \
+              _FILE,                                                     \
+              "%02d-%02d-%d %02d:%02d:%02d: ",                           \
+              tm_info->tm_year + 1900, tm_info->tm_mon + 1,              \
+              tm_info->tm_mday, tm_info->tm_hour,                        \
+              tm_info->tm_min, tm_info->tm_sec);                         \
+      } while(0)
+#else
+  #define ____PRINT_DATETIME_TO_FILE(IGNORE) ((void)0)
+#endif
+
+#define ___LOG(MSG, LOG_TYPE, ...)                                       \
+    do {                                                                 \
+        DEBUG_GOODIES_FPRINTF(DEBUG_GODIES_LOG_FILE,                     \
+                              "%s:%d: %s: ",                             \
+                              __FILE__, __LINE__, #LOG_TYPE);            \
+        ____PRINT_DATETIME_TO_FILE(DEBUG_GODIES_LOG_FILE);               \
+        DEBUG_GOODIES_FPRINTF(DEBUG_GODIES_LOG_FILE, MSG,                \
+                              ##__VA_ARGS__);                            \
+        DEBUG_GOODIES_FPRINTF(DEBUG_GODIES_LOG_FILE, "\n");              \
+} while(0)
+
 // Default panic behaviour. If either 'DEBUG_PANIC_BEHAVIOUR' or
 // 'RELEASE_PANIC_BEHAVIOUR' are not defined this is the default.
 #define DEFAULT_PANIC_BEHAVIOUR(MSG, ...)                                \
     do {                                                                 \
-        DEBUG_GOODIES_FPRINTF(DEBUG_GODIES_LOG_FILE,                     \
-                              "%s:%d: Panic: ", __FILE__, __LINE__);     \
-        DEBUG_GOODIES_FPRINTF(DEBUG_GODIES_LOG_FILE,                     \
-                              MSG, ##__VA_ARGS__);                       \
-        DEBUG_GOODIES_FPRINTF(DEBUG_GODIES_LOG_FILE, "\n");              \
+        ___LOG(MSG, PANIC, ##__VA_ARGS__);                               \
     } while(0)
 
 // Panic macro defaults.
@@ -109,17 +138,12 @@
 
 // Logic that takes place when single 'POP_TIMER' is done.
 #ifndef TIME_SCOPE_MSG
-  #include <iostream>
   #define TIME_SCOPE_MSG(NAME, TIME)                                     \
-    DEBUG_GOODIES_FPRINTF(DEBUG_GODIES_BENCHMARK_FILE,                   \
-                          "%s:%d: TIMED: %s - %.3fs\n",                  \
-                          __FILE__, __LINE__,                            \
-                          NAME, (float)TIME / 1000)
+      ___LOG("%s - %.3fs", "TIMED: ", NAME, (float)TIME / 1000)
 #endif
 
 // Logic that takes place when after the benchmark is done.
 #ifndef BENCHMARK_MSG
-  #include <iostream>
   #define BENCHMARK_MSG(NAME, REPEAT, BEST, WORST, AVG)                  \
     DEBUG_GOODIES_FPRINTF(DEBUG_GODIES_BENCHMARK_FILE,                   \
         "%s:%d: BENCH: %s(x%d) - AVG: %.3fs, BEST: %.3fs, WORST: %.3fs\n", \
@@ -157,9 +181,7 @@
       do {                                                               \
           if (!(expr))                                                   \
           {                                                              \
-              DEBUG_GOODIES_FPRINTF(DEBUG_GODIES_LOG_FILE,               \
-                                    "%s:%d: Assertion broken: %s\n",     \
-                                    __FILE__, __LINE__, #EXPR)           \
+              ___LOG("%s", ASSERT_FAIL, #EXPR);                          \
               BREAK();                                                   \
           }                                                              \
       } while(0)
@@ -280,33 +302,34 @@
   #define RUN_BENCHMARK(IGNORE1, IGNORE2, IGNORE3) ((void)0)
 #endif
 
-// Auxiliary macro.
-#define ___BENCHMARK_BEFORE_MAIN_AUX(NAME, BNAME, REPEAT, EXPR)          \
-    struct NAME                                                          \
-    {                                                                    \
-        NAME()                                                           \
-        {                                                                \
-            unsigned long long best = 0, worst = 0, sum = 0;             \
-            for (int i = 0; i < REPEAT; ++i)                             \
-            {                                                            \
-                auto _bench_start_ = std::chrono::system_clock::now();   \
-                { EXPR; }                                                \
-                std::chrono::milliseconds _bench_diff_ =                 \
-                    std::chrono::duration_cast<                          \
-                    std::chrono::milliseconds>(                          \
-                        std::chrono::system_clock::now()                 \
-                        - _bench_start_);                                \
+#ifdef BENCHMARK
+ #define ___BENCHMARK_BEFORE_MAIN_AUX(NAME, BNAME, REPEAT, EXPR)         \
+     struct NAME                                                         \
+     {                                                                   \
+         NAME()                                                          \
+         {                                                               \
+             unsigned long long best = 0, worst = 0, sum = 0;            \
+             for (int i = 0; i < REPEAT; ++i)                            \
+             {                                                           \
+                 auto _bench_start_ = std::chrono::system_clock::now();  \
+                 { EXPR; }                                               \
+                 std::chrono::milliseconds _bench_diff_ =                \
+                     std::chrono::duration_cast<                         \
+                     std::chrono::milliseconds>(                         \
+                         std::chrono::system_clock::now()                \
+                         - _bench_start_);                               \
                                                                          \
-                unsigned long long _bench_res_ = _bench_diff_.count();   \
-                best = _bench_res_ < best || best == 0                   \
-                                     ? _bench_res_ : best;               \
-                worst = _bench_res_ > worst ? _bench_res_ : worst;       \
-                sum += _bench_res_;                                      \
-            }                                                            \
-            float avg = sum / REPEAT;                                    \
-            BENCHMARK_MSG(BNAME, REPEAT, best, worst, avg);              \
-        }                                                                \
-    }; NAME ANONYMUS_NAME(___ANON_VARIABLE_NAME___)
+                 unsigned long long _bench_res_ = _bench_diff_.count();  \
+                 best = _bench_res_ < best || best == 0                  \
+                                      ? _bench_res_ : best;              \
+                 worst = _bench_res_ > worst ? _bench_res_ : worst;      \
+                 sum += _bench_res_;                                     \
+             }                                                           \
+             float avg = sum / REPEAT;                                   \
+             BENCHMARK_MSG(BNAME, REPEAT, best, worst, avg);             \
+         }                                                               \
+     }; NAME ANONYMUS_NAME(___ANON_VARIABLE_NAME___)
+#endif
 
 #ifdef BENCHMARK
   #define BENCHMARK_BEFORE_MAIN(NAME, REPEAT, EXPR)                      \
@@ -320,38 +343,6 @@
 
 // TODO: Refactor to dont use fprintf.
 // TODO: Add info about functionality.
-
-// Define 'LOG_GODIES_USE_DATE' for time info in logs, requires chorno
-#ifdef LOG_GODIES_USE_DATE
-  #include <chrono>
-  #define ____PRINT_DATETIME_TO_FILE(_FILE)                              \
-      do {                                                               \
-          auto in_time_t =                                               \
-              std::chrono::system_clock::to_time_t(                      \
-                  std::chrono::system_clock::now());                     \
-          auto tm_info = localtime(&in_time_t);                          \
-                                                                         \
-          DEBUG_GOODIES_FPRINTF(                                         \
-              _FILE,                                                     \
-              "%02d-%02d-%d %02d:%02d:%02d: ",                           \
-              tm_info->tm_year + 1900, tm_info->tm_mon + 1,              \
-              tm_info->tm_mday, tm_info->tm_hour,                        \
-              tm_info->tm_min, tm_info->tm_sec);                         \
-      } while(0)
-#else
-  #define ____PRINT_DATETIME_TO_FILE(IGNORE) ((void)0)
-#endif
-
-#define ___LOG(MSG, LOG_TYPE, ...)                                       \
-    do {                                                                 \
-        DEBUG_GOODIES_FPRINTF(DEBUG_GODIES_LOG_FILE,                     \
-                              "%s:%d: %s: ",                             \
-                              __FILE__, __LINE__, #LOG_TYPE);            \
-        ____PRINT_DATETIME_TO_FILE(DEBUG_GODIES_LOG_FILE);               \
-        DEBUG_GOODIES_FPRINTF(DEBUG_GODIES_LOG_FILE, MSG,                \
-                              ##__VA_ARGS__);                            \
-        DEBUG_GOODIES_FPRINTF(DEBUG_GODIES_LOG_FILE, "\n");              \
-} while(0)
 
 #if defined(DEBUG) && defined(LOGGING)
   #define LOG_TRACE(MSG, ...) ___LOG(MSG, TRACE, ##__VA_ARGS__)
