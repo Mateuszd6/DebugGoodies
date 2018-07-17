@@ -171,7 +171,7 @@
 #ifdef DEBUG
   #define ASSERT(EXPR)                                                   \
       do {                                                               \
-          if (!(expr))                                                   \
+          if (!(EXPR))                                                   \
           {                                                              \
               DG_INT_LOG("%s", ASSERT_FAIL, #EXPR);                      \
               BREAK();                                                   \
