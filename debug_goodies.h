@@ -177,7 +177,7 @@
 #ifdef DEBUG
   #define ASSERT(EXPR)                                                   \
       do {                                                               \
-          if (!(expr))                                                   \
+          if (!(EXPR))                                                   \
           {                                                              \
               DG_INT_LOG("%s", ASSERT_FAIL, #EXPR);                      \
               BREAK();                                                   \
@@ -189,7 +189,7 @@
 
 /// RUNTIME ASSERT.
 // Assertion that is evaluated at runtime. In release mode, if
-// expr is false, macro is expanded into PANIC, in debug mode,
+// EXPR is false, macro is expanded into PANIC, in debug mode,
 // this is just regular asser.
 #ifdef DEBUG
   #define ALWAYS_ASSERT(EXPR)                                            \
