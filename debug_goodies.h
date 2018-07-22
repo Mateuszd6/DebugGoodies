@@ -12,22 +12,28 @@
 // * BENCHMARK_BEFORE_MAIN(NAME, REPEAT, EXPR)
 
 // Define 'LOGGING' to enable:
-// * LOG_TRACE (Only if 'DEBUG' is defined)
-// * LOG_DEBUG (Only if 'DEBUG' is defined)
-// * LOG_INFO
-// * LOG_WARN
-// * LOG_ERROR
-// * LOG_FATAL
+// * LOG_TRACE (Only if 'DEBUG' is defined) LOG_LVL 0+
+// * LOG_DEBUG (Only if 'DEBUG' is defined) LOG_LVL 0+
+// * LOG_INFO                               LOG_LVL 0+
+// * LOG_WARN                               LOG_LVL 1+
+// * LOG_ERROR                              LOG_LVL 2+
+// * LOG_FATAL                              LOG_LVL 2+
 
 // Other definable stuff:
 // * DG_USE_DATE (To add date & time to your logs)
 // * DG_FPRINTF (If you don't want to use fprintf)
 // * DG_BENCHMARK_FILE (To redirect benchmarks results)
 // * DG_LOG_FILE (To redirect logs to the file, not stderr)
-// * DG_DEBUG_PANIC_BEHAVIOUR(MSG, ...) (Panic logic if defined DEBUG)
-// * DG_RELEASE_PANIC_BEHAVIOUR(MSG, ...) (Panic logic if not defined DEBUG)
 // * DG_TIME_SCOPE_MSG(NAME, TIME) (Logic when time scope ends)
 // * DG_BENCHMARK_MSG(NAME, REPEAT, BEST, WORST, AVG) (Logic after benchmark)
+// * DG_DEBUG_PANIC_BEHAVIOUR(MSG, ...) (Panic logic if defined DEBUG)
+// * DG_RELEASE_PANIC_BEHAVIOUR(MSG, ...) (Panic logic if not defined DEBUG)
+// * DG_LOG_LVL - This defines the verbosity level for the logging API.
+//     Possible values (If not defined, default is the first one):
+//       DG_LOG_LVL_ALL   - Display all messages.
+//       DG_LOG_LVL_WARN  - Display only warrnings and errors.
+//       DG_LOG_LVL_ERROR - Display errors only.
+
 
 // TODO: Add ability not to use chrono.
 
@@ -107,7 +113,7 @@
         DG_FPRINTF(DG_LOG_FILE, MSG,                                     \
                               ##__VA_ARGS__);                            \
         DG_FPRINTF(DG_LOG_FILE, "\n");                                   \
-} while(0)
+    } while(0)
 
 // Default panic behaviour. If either 'DG_DEBUG_PANIC_BEHAVIOUR' or
 // 'DG_RELEASE_PANIC_BEHAVIOUR' are not defined this is the default.
@@ -333,9 +339,30 @@
 
 // ------------------- LOGGING -------------------
 
+// Define to display all logs.
+#define DG_LOG_LVL_ALL (0)
+
+// Print only warrnings, errors, etc...
+#define DG_LOG_LVL_WARN (1)
+
+// Ignore most logs, warrnings included. Print only Errors and Fatals.
+#define DG_LOG_LVL_ERROR (2)
+
+#ifndef DG_LOG_LVL
+  #define DG_LOG_LVL (0)
+#endif
+
+// TODO: Summary these!
+#define DG_INT_LOG_AUX(MSG, TYPE, LVL, CURR_LVL, ...)                    \
+    do {                                                                 \
+        if ((LVL) >= (CURR_LVL)) {                                       \
+            DG_INT_LOG(MSG, TYPE, ##__VA_ARGS__);                        \
+        }                                                                \
+    } while(0)
+
 #if defined(DEBUG) && defined(LOGGING)
-  #define LOG_TRACE(MSG, ...) DG_INT_LOG(MSG, TRACE, ##__VA_ARGS__)
-  #define LOG_DEBUG(MSG, ...) DG_INT_LOG(MSG, DEBUG, ##__VA_ARGS__)
+  #define LOG_TRACE(MSG, ...) DG_INT_LOG_AUX(MSG, TRACE, 0, DG_LOG_LVL, ##__VA_ARGS__)
+  #define LOG_DEBUG(MSG, ...) DG_INT_LOG_AUX(MSG, DEBUG, 0, DG_LOG_LVL, ##__VA_ARGS__)
 #elif defined(LOGGING)
   #define LOG_TRACE(IGNORE, ...) ((void)0)
   #define LOG_DEBUG(IGNORE, ...) ((void)0)
@@ -343,43 +370,10 @@
 #endif
 
 #ifdef LOGGING
-  #define LOG_INFO(MSG, ...) DG_INT_LOG(MSG, INFO, ##__VA_ARGS__)
-  #define LOG_WARN(MSG, ...) DG_INT_LOG(MSG, WARN, ##__VA_ARGS__)
-  #define LOG_ERROR(MSG, ...) DG_INT_LOG(MSG, ERROR, ##__VA_ARGS__)
-  #define LOG_FATAL(MSG, ...) DG_INT_LOG(MSG, FATAL, ##__VA_ARGS__)
-#endif
-
-// Undef auxiliary macros.
-#if DG_INT_CONCAT_IMPL
-  #undef DG_INT_CONCAT_IMPL
-#endif
-
-#if DG_INT_CONCAT
-  #undef DG_INT_CONCAT
-#endif
-
-#if DG_INT_ANON_NAME
-  #undef DG_INT_ANON_NAME
-#endif
-
-#if DG_INT_BREAK
-  #undef DG_INT_BREAK
-#endif
-
-#if DG_INT_DATETIME_TO_FILE
-  #undef DG_INT_DATETIME_TO_FILE
-#endif
-
-#if DG_INT_LOG
-  #undef DG_INT_LOG
-#endif
-
-#if DG_INT_DEFAULT_PANIC_BEHAVIOUR
-  #undef DG_INT_DEFAULT_PANIC_BEHAVIOUR
-#endif
-
-#if DG_INT_BENCHMARK_BEFORE_MAIN_AUX
-  #undef DG_INT_BENCHMARK_BEFORE_MAIN_AUX
+  #define LOG_INFO(MSG, ...) DG_INT_LOG_AUX(MSG, INFO, 0, DG_LOG_LVL, ##__VA_ARGS__)
+  #define LOG_WARN(MSG, ...) DG_INT_LOG_AUX(MSG, WARN, 1, DG_LOG_LVL, ##__VA_ARGS__)
+  #define LOG_ERROR(MSG, ...) DG_INT_LOG_AUX(MSG, ERROR, 2, DG_LOG_LVL, ##__VA_ARGS__)
+  #define LOG_FATAL(MSG, ...) DG_INT_LOG_AUX(MSG, FATAL, 2, DG_LOG_LVL, ##__VA_ARGS__)
 #endif
 
 #endif // __DEBUG_GOODIES_H__
