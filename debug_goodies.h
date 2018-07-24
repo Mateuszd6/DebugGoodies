@@ -28,11 +28,12 @@
 // * DG_BENCHMARK_MSG(NAME, REPEAT, BEST, WORST, AVG) (Logic after benchmark)
 // * DG_DEBUG_PANIC_BEHAVIOUR(MSG, ...) (Panic logic if defined DEBUG)
 // * DG_RELEASE_PANIC_BEHAVIOUR(MSG, ...) (Panic logic if not defined DEBUG)
+// * DG_USE_COLORS - if not 0, output will be displayed with some ASCII escape color codes.
 // * DG_LOG_LVL - This defines the verbosity level for the logging API.
-//     Possible values (If not defined, default is the first one):
-//       DG_LOG_LVL_ALL   - Display all messages.
-//       DG_LOG_LVL_WARN  - Display only warrnings and errors.
-//       DG_LOG_LVL_ERROR - Display errors only.
+//       Possible values (If not defined, default is the first one):
+//         DG_LOG_LVL_ALL   - Display all messages.
+//         DG_LOG_LVL_WARN  - Display only warrnings and errors.
+//         DG_LOG_LVL_ERROR - Display errors only.
 
 
 // TODO: Add ability not to use chrono.
@@ -52,6 +53,9 @@
 #endif
 
 // ------------------- PLATFORM AND DEFAULTS -------------------
+
+#define DG_INT_RED_COLOR_ID 31
+#define DG_INT_YELLOW_COLOR_ID 33
 
 // Cross platform debug break.
 // TODO: Tests it on clang under WIN32 machine.
@@ -104,14 +108,36 @@
   #define DG_INT_DATETIME_TO_FILE(IGNORE) ((void)0)
 #endif
 
-#define DG_INT_LOG(MSG, LOG_TYPE, ...)                                   \
+#ifndef DG_USE_COLORS
+  #define DG_USE_COLORS 0
+#endif
+
+#define DG_INT_START_COLOR(COLOR_ID)                                     \
+  do {                                                                   \
+      if (COLOR_ID != -1 && DG_USE_COLORS)                               \
+      {                                                                  \
+          DG_FPRINTF(DG_LOG_FILE, "\033[1;%sm", #COLOR_ID);              \
+      }                                                                  \
+  } while(0)
+
+#ifdef DG_USE_COLORS
+  #define DG_INT_RESET_COLOR()                                           \
     do {                                                                 \
-        DG_FPRINTF(DG_LOG_FILE,                                          \
-                              "%s:%d: %s: ",                             \
-                              __FILE__, __LINE__, #LOG_TYPE);            \
+        if (DG_USE_COLORS)                                               \
+        {                                                                \
+            DG_FPRINTF(DG_LOG_FILE, "\033[0m");                          \
+        }                                                                \
+    } while(0)
+#endif
+
+#define DG_INT_LOG(MSG, LOG_TYPE, COLOR_ID, ...)                         \
+    do {                                                                 \
+        DG_FPRINTF(DG_LOG_FILE, "%s:%d: ", __FILE__, __LINE__);          \
+        DG_INT_START_COLOR(COLOR_ID);                                    \
+        DG_FPRINTF(DG_LOG_FILE, "%s: ", #LOG_TYPE);                      \
+        DG_INT_RESET_COLOR();                                            \
         DG_INT_DATETIME_TO_FILE(DG_LOG_FILE);                            \
-        DG_FPRINTF(DG_LOG_FILE, MSG,                                     \
-                              ##__VA_ARGS__);                            \
+        DG_FPRINTF(DG_LOG_FILE, MSG, ##__VA_ARGS__);                     \
         DG_FPRINTF(DG_LOG_FILE, "\n");                                   \
     } while(0)
 
@@ -119,7 +145,7 @@
 // 'DG_RELEASE_PANIC_BEHAVIOUR' are not defined this is the default.
 #define DG_INT_DEFAULT_PANIC_BEHAVIOUR(MSG, ...)                         \
     do {                                                                 \
-        DG_INT_LOG(MSG, PANIC, ##__VA_ARGS__);                           \
+        DG_INT_LOG(MSG, PANIC, DG_INT_RED_COLOR_ID, ##__VA_ARGS__);      \
     } while(0)
 
 // Panic macro defaults.
@@ -137,7 +163,7 @@
 // Logic that takes place when single 'POP_TIMER' is done.
 #ifndef DG_TIME_SCOPE_MSG
   #define DG_TIME_SCOPE_MSG(NAME, TIME)                                  \
-      DG_INT_LOG("%s - %.3fs", "TIMED: ", NAME, (float)TIME / 1000)
+    DG_INT_LOG("%s - %.3fs", "TIMED: ", NAME, -1, (float)TIME / 1000)
 #endif
 
 // Logic that takes place when after the benchmark is done.
@@ -179,7 +205,7 @@
       do {                                                               \
           if (!(EXPR))                                                   \
           {                                                              \
-              DG_INT_LOG("%s", ASSERT_FAIL, #EXPR);                      \
+              DG_INT_LOG("%s", ASSERT_FAIL, DG_INT_RED_COLOR_ID, #EXPR); \
               BREAK();                                                   \
           }                                                              \
       } while(0)
@@ -199,7 +225,7 @@
 #else
   #define ALWAYS_ASSERT(EXPR)                                            \
       do {                                                               \
-          if (!(EXPR)) { PANIC("Assertion broken: %s\n", #EXPR); }       \
+          if (!(EXPR)) { PANIC("Assertion broken: %s", #EXPR); }       \
       } while(0)
 #endif
 
@@ -353,16 +379,16 @@
 #endif
 
 // TODO: Summary these!
-#define DG_INT_LOG_AUX(MSG, TYPE, LVL, CURR_LVL, ...)                    \
+#define DG_INT_LOG_AUX(MSG, TYPE, LVL, CURR_LVL, COLOR_ID, ...)          \
     do {                                                                 \
         if ((LVL) >= (CURR_LVL)) {                                       \
-            DG_INT_LOG(MSG, TYPE, ##__VA_ARGS__);                        \
+            DG_INT_LOG(MSG, TYPE, COLOR_ID, ##__VA_ARGS__);              \
         }                                                                \
     } while(0)
 
 #if defined(DEBUG) && defined(LOGGING)
-  #define LOG_TRACE(MSG, ...) DG_INT_LOG_AUX(MSG, TRACE, 0, DG_LOG_LVL, ##__VA_ARGS__)
-  #define LOG_DEBUG(MSG, ...) DG_INT_LOG_AUX(MSG, DEBUG, 0, DG_LOG_LVL, ##__VA_ARGS__)
+  #define LOG_TRACE(MSG, ...) DG_INT_LOG_AUX(MSG, TRACE, 0, DG_LOG_LVL, -1, ##__VA_ARGS__)
+  #define LOG_DEBUG(MSG, ...) DG_INT_LOG_AUX(MSG, DEBUG, 0, DG_LOG_LVL, -1, ##__VA_ARGS__)
 #elif defined(LOGGING)
   #define LOG_TRACE(IGNORE, ...) ((void)0)
   #define LOG_DEBUG(IGNORE, ...) ((void)0)
@@ -370,10 +396,10 @@
 #endif
 
 #ifdef LOGGING
-  #define LOG_INFO(MSG, ...) DG_INT_LOG_AUX(MSG, INFO, 0, DG_LOG_LVL, ##__VA_ARGS__)
-  #define LOG_WARN(MSG, ...) DG_INT_LOG_AUX(MSG, WARN, 1, DG_LOG_LVL, ##__VA_ARGS__)
-  #define LOG_ERROR(MSG, ...) DG_INT_LOG_AUX(MSG, ERROR, 2, DG_LOG_LVL, ##__VA_ARGS__)
-  #define LOG_FATAL(MSG, ...) DG_INT_LOG_AUX(MSG, FATAL, 2, DG_LOG_LVL, ##__VA_ARGS__)
+  #define LOG_INFO(MSG, ...) DG_INT_LOG_AUX(MSG, INFO, 0, DG_LOG_LVL, -1, ##__VA_ARGS__)
+  #define LOG_WARN(MSG, ...) DG_INT_LOG_AUX(MSG, WARN, 1, DG_LOG_LVL, DG_INT_YELLOW_COLOR_ID, ##__VA_ARGS__)
+  #define LOG_ERROR(MSG, ...) DG_INT_LOG_AUX(MSG, ERROR, 2, DG_LOG_LVL, DG_INT_RED_COLOR_ID, ##__VA_ARGS__)
+  #define LOG_FATAL(MSG, ...) DG_INT_LOG_AUX(MSG, FATAL, 2, DG_LOG_LVL, DG_INT_RED_COLOR_ID, ##__VA_ARGS__)
 #endif
 
 #endif // __DEBUG_GOODIES_H__
